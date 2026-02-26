@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
+import ErrorModal from "@/components/ErrorModal";
+import ConfirmModal from "@/components/ConfirmModal";
 
 
 
@@ -29,6 +31,13 @@ export default function DashboardPage() {
   const [creating, setCreating] = useState(false);
   const [uploadingFor, setUploadingFor] = useState<string | null>(null);
   const [showCreate, setShowCreate] = useState(false);
+
+  // Custom Modal States
+  const [errorMsg, setErrorMsg] = useState("");
+  const [subjectToDelete, setSubjectToDelete] = useState<{ id: string; name: string } | null>(null);
+  const [isDeletingSubject, setIsDeletingSubject] = useState(false);
+  const [docToDelete, setDocToDelete] = useState<{ subjectId: string; docId: string } | null>(null);
+  const [isDeletingDoc, setIsDeletingDoc] = useState(false);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -80,22 +89,30 @@ export default function DashboardPage() {
         fetchSubjects();
       } else {
         const data = await res.json();
-        alert(data.error || "Failed to create subject");
+        setErrorMsg(data.error || "Failed to create subject");
       }
     } catch {
-      alert("Failed to create subject");
+      setErrorMsg("Failed to create subject");
     } finally {
       setCreating(false);
     }
   };
 
-  const deleteSubject = async (id: string, name: string) => {
-    if (!confirm(`Delete "${name}" and all its notes?`)) return;
+  const triggerDeleteSubject = (id: string, name: string) => {
+    setSubjectToDelete({ id, name });
+  };
+
+  const confirmDeleteSubject = async () => {
+    if (!subjectToDelete) return;
+    setIsDeletingSubject(true);
     try {
-      await fetch(`/api/subjects/${id}`, { method: "DELETE" });
-      fetchSubjects();
+      await fetch(`/api/subjects/${subjectToDelete.id}`, { method: "DELETE" });
+      await fetchSubjects();
     } catch {
-      alert("Failed to delete subject");
+      setErrorMsg("Failed to delete subject");
+    } finally {
+      setIsDeletingSubject(false);
+      setSubjectToDelete(null);
     }
   };
 
@@ -114,23 +131,32 @@ export default function DashboardPage() {
         fetchDocs(subjectId);
       } else {
         const data = await res.json();
-        alert(data.error || "Upload failed");
+        setErrorMsg(data.error || "Upload failed");
       }
     } catch {
-      alert("Upload failed");
+      setErrorMsg("Upload failed");
     } finally {
       setUploadingFor(null);
     }
   };
 
-  const deleteDoc = async (subjectId: string, docId: string) => {
+  const triggerDeleteDoc = (subjectId: string, docId: string) => {
+    setDocToDelete({ subjectId, docId });
+  };
+
+  const confirmDeleteDoc = async () => {
+    if (!docToDelete) return;
+    setIsDeletingDoc(true);
     try {
-      await fetch(`/api/subjects/${subjectId}/documents/${docId}`, {
+      await fetch(`/api/subjects/${docToDelete.subjectId}/documents/${docToDelete.docId}`, {
         method: "DELETE",
       });
-      fetchDocs(subjectId);
+      fetchDocs(docToDelete.subjectId);
     } catch {
-      alert("Failed to delete document");
+      setErrorMsg("Failed to delete document");
+    } finally {
+      setIsDeletingDoc(false);
+      setDocToDelete(null);
     }
   };
 
@@ -226,7 +252,7 @@ export default function DashboardPage() {
                     <div style={{ ...styles.cardDot, background: colors[idx % 3] }} />
                     <h3 style={styles.cardTitle}>{sub.name}</h3>
                     <button
-                      onClick={() => deleteSubject(sub._id, sub.name)}
+                      onClick={() => triggerDeleteSubject(sub._id, sub.name)}
                       style={styles.deleteBtn}
                       title="Delete subject"
                     >
@@ -253,7 +279,7 @@ export default function DashboardPage() {
                         <div key={doc._id} style={styles.docItem}>
                           <span style={styles.docName}>📄 {doc.fileName}</span>
                           <button
-                            onClick={() => deleteDoc(sub._id, doc._id)}
+                            onClick={() => triggerDeleteDoc(sub._id, doc._id)}
                             style={styles.docDelete}
                           >
                             ×
@@ -314,6 +340,35 @@ export default function DashboardPage() {
           </div>
         )}
       </main>
+
+      <ErrorModal
+        isOpen={!!errorMsg}
+        message={errorMsg}
+        onClose={() => setErrorMsg("")}
+      />
+
+      <ConfirmModal
+        isOpen={!!subjectToDelete}
+        title="Delete Subject"
+        message={isDeletingSubject ? "Deleting..." : `Are you sure you want to delete "${subjectToDelete?.name}" and all its uploaded notes?`}
+        confirmText={isDeletingSubject ? "..." : "Delete"}
+        cancelText="Cancel"
+        isDestructive={true}
+        onConfirm={confirmDeleteSubject}
+        onCancel={() => !isDeletingSubject && setSubjectToDelete(null)}
+      />
+
+      <ConfirmModal
+        isOpen={!!docToDelete}
+        title="Delete Document"
+        message={isDeletingDoc ? "Deleting..." : "Are you sure you want to delete this document?"}
+        confirmText={isDeletingDoc ? "..." : "Delete"}
+        cancelText="Cancel"
+        isDestructive={true}
+        onConfirm={confirmDeleteDoc}
+        onCancel={() => !isDeletingDoc && setDocToDelete(null)}
+      />
+
     </div>
   );
 }
