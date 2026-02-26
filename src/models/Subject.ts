@@ -25,17 +25,16 @@ const SubjectSchema = new Schema<ISubjectDoc>(
 );
 
 // Enforce max 3 subjects per user (safety net — API route also checks)
-SubjectSchema.pre("save", async function (next) {
+SubjectSchema.pre("save", async function () {
     if (this.isNew) {
         const SubjectModel = mongoose.model("Subject");
         const count = await SubjectModel.countDocuments({
             userId: this.userId,
         });
         if (count >= 3) {
-            return next(new Error("Maximum of 3 subjects allowed per user"));
+            throw new Error("Maximum of 3 subjects allowed per user");
         }
     }
-    return next();
 });
 
 const Subject: Model<ISubjectDoc> =
