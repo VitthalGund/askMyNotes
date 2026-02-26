@@ -72,6 +72,9 @@ const styles: Record<string, React.CSSProperties> = {
     display: "flex",
     flexDirection: "column",
     gap: 16,
+    background: "var(--bg-secondary)", // Better contrast than transparent card
+    border: "1px solid rgba(255, 255, 255, 0.15)",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.8)",
   },
   header: {
     display: "flex",

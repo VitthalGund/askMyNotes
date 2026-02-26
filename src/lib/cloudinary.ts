@@ -20,11 +20,15 @@ export async function uploadToCloudinary(
     folder: string = "askmynotes"
 ): Promise<{ secure_url: string; public_id: string }> {
     return new Promise((resolve, reject) => {
+        const extMatch = fileName.match(/\.[0-9a-z]+$/i);
+        const ext = extMatch ? extMatch[0] : "";
+        const baseName = extMatch ? fileName.slice(0, -ext.length) : fileName;
+
         const uploadStream = cloudinary.uploader.upload_stream(
             {
                 folder,
                 resource_type: "raw", // Needed for PDFs and TXTs
-                public_id: fileName.split(".")[0] + "_" + Date.now(),
+                public_id: baseName.replace(/[^a-zA-Z0-9_]/g, "_") + "_" + Date.now() + ext,
                 // Keep original extension if needed: use_filename: true, unique_filename: true
             },
             (error, result) => {

@@ -23,7 +23,7 @@ export default function PreviewModal({
         <div style={styles.body}>
           {fileUrl ? (
             <iframe
-              src={fileUrl}
+              src={fileName.toLowerCase().endsWith(".pdf") ? `https://docs.google.com/viewer?url=${encodeURIComponent(fileUrl)}&embedded=true` : fileUrl}
               style={styles.iframe}
               title={fileName}
             />
@@ -63,6 +63,9 @@ const styles: Record<string, React.CSSProperties> = {
     flexDirection: "column",
     padding: 20,
     gap: 16,
+    background: "var(--bg-secondary)", // Better contrast than transparent card
+    border: "1px solid rgba(255, 255, 255, 0.15)",
+    boxShadow: "0 25px 50px -12px rgba(0, 0, 0, 0.8)",
   },
   header: {
     display: "flex",

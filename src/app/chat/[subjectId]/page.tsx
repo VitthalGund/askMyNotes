@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 
 import ErrorModal from "@/components/ErrorModal";
 import ConfirmModal from "@/components/ConfirmModal";
+import PreviewModal from "@/components/PreviewModal";
 
 interface Citation {
   fileName: string;
@@ -49,10 +50,10 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
   const [editTitle, setEditTitle] = useState("");
   const [creatingChat, setCreatingChat] = useState(false);
   
-  // Custom Modal states
   const [errorMsg, setErrorMsg] = useState("");
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ url: string | null; name: string } | null>(null);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isListening, setIsListening] = useState(false);
@@ -491,15 +492,14 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
                     {msg.citations.map((c, ci) => (
                       <div key={ci} style={styles.citationItem}>
                         {c.fileUrl ? (
-                          <a 
-                            href={`${c.fileUrl}#page=${c.pageNumber}`} 
-                            target="_blank" 
-                            rel="noopener noreferrer"
-                            style={{ color: "var(--accent-2)", textDecoration: "none" }}
+                          <button 
+                            onClick={() => setPreviewFile({ url: `${c.fileUrl}#page=${c.pageNumber}`, name: c.fileName })}
+                            style={styles.citationBtn}
                             className="hover-underline"
+                            title={`Preview ${c.fileName} on page ${c.pageNumber}`}
                           >
                             📄 {c.fileName} — Page {c.pageNumber}, Chunk {c.chunkIndex}
-                          </a>
+                          </button>
                         ) : (
                           <span>📄 {c.fileName} — Page {c.pageNumber}, Chunk {c.chunkIndex}</span>
                         )}
@@ -613,6 +613,13 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
         isDestructive={true}
         onConfirm={confirmDelete}
         onCancel={() => !isDeleting && setChatToDelete(null)}
+      />
+
+      <PreviewModal
+        isOpen={!!previewFile}
+        fileUrl={previewFile?.url || null}
+        fileName={previewFile?.name || ""}
+        onClose={() => setPreviewFile(null)}
       />
 
       {/* Sidebar hover & typewriter animations */}
@@ -813,6 +820,15 @@ const styles: Record<string, React.CSSProperties> = {
     fontSize: 12,
     color: "var(--text-secondary)",
     padding: "3px 0",
+  },
+  citationBtn: {
+    background: "none",
+    border: "none",
+    color: "var(--accent-2)",
+    cursor: "pointer",
+    fontSize: "inherit",
+    padding: 0,
+    textAlign: "left",
   },
   evidence: {
     marginTop: 10,
