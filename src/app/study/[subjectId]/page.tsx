@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import ReactMarkdown from "react-markdown";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface Citation {
   fileName: string;
@@ -147,11 +147,24 @@ export default function StudyModePage({ params }: { params: Promise<{ subjectId:
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
       setCheatsheet(data.cheatsheet || "");
-    } catch (err: any) {
+    } catch (err: unknown) {
       setError("Failed to generate cheatsheet.");
     } finally {
       setLoading(false);
     }
+  };
+
+  const downloadMarkdown = () => {
+    if (!cheatsheet) return;
+    const blob = new Blob([cheatsheet], { type: "text/markdown" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `AskMyNotes_Cheatsheet.md`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
   };
 
   const toggleStar = async (type: "mcq" | "short_answer", qIndex: number, questionObj: any) => {
@@ -302,13 +315,19 @@ export default function StudyModePage({ params }: { params: Promise<{ subjectId:
           </div>
         ) : mode === "cheatsheet" ? (
           // --- CHEATSHEET MODE ---
-          <div className="glass-card animate-fade-in" style={{padding: 32, background: 'rgba(255,255,255,0.02)'}}>
-            <div style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderBottom: '1px solid var(--glass-border)', paddingBottom: 16}}>
+          <div className="glass-card animate-fade-in print-container" style={{padding: 32, background: 'rgba(255,255,255,0.02)'}}>
+            <div className="print-hide" style={{display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 24, borderBottom: '1px solid var(--glass-border)', paddingBottom: 16}}>
               <h2 style={{fontSize: 24, fontWeight: 700}}>Exam Cheatsheet</h2>
-              <button className="btn-secondary" onClick={() => navigator.clipboard.writeText(cheatsheet)}>Copy Text</button>
+              <div style={{display: "flex", gap: "10px"}}>
+                <button className="btn-secondary" onClick={() => navigator.clipboard.writeText(cheatsheet)}>Copy Text</button>
+                <button className="btn-secondary" onClick={downloadMarkdown}>Download .MD</button>
+                <button className="btn-gradient" onClick={() => window.print()}>🖨️ Print / PDF</button>
+              </div>
             </div>
-            <div className="markdown-body" style={{fontSize: 15, lineHeight: 1.6, color: 'var(--text-primary)'}}>
-              <ReactMarkdown>{cheatsheet}</ReactMarkdown>
+            
+            {/* The MarkdownRenderer parses Mermaid and structures beautifully */}
+            <div className="markdown-body printable-markdown" style={{fontSize: 15, lineHeight: 1.6, color: 'var(--text-primary)'}}>
+              <MarkdownRenderer content={cheatsheet} />
             </div>
           </div>
         ) : mode === "activerecall" ? (
