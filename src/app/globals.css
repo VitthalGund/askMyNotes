@@ -32,7 +32,8 @@
   box-sizing: border-box;
 }
 
-html, body {
+html,
+body {
   font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
   background: var(--bg-primary);
   color: var(--text-primary);
@@ -168,22 +169,45 @@ html, body {
 
 /* Animations */
 @keyframes fadeIn {
-  from { opacity: 0; transform: translateY(10px); }
-  to { opacity: 1; transform: translateY(0); }
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
 }
 
 @keyframes slideIn {
-  from { opacity: 0; transform: translateX(-20px); }
-  to { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes pulse-glow {
-  0%, 100% { box-shadow: 0 0 5px rgba(124, 58, 237, 0.3); }
-  50% { box-shadow: 0 0 20px rgba(124, 58, 237, 0.6); }
+
+  0%,
+  100% {
+    box-shadow: 0 0 5px rgba(124, 58, 237, 0.3);
+  }
+
+  50% {
+    box-shadow: 0 0 20px rgba(124, 58, 237, 0.6);
+  }
 }
 
 @keyframes spin {
-  to { transform: rotate(360deg); }
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 .animate-fade-in {
@@ -243,4 +267,38 @@ html, body {
   opacity: 0.15;
   pointer-events: none;
   z-index: 0;
+}
+
+/* --- Google Translate Overrides --- */
+/* Hide the Google Translate top banner */
+iframe.goog-te-banner-frame,
+.goog-te-banner-frame,
+.skiptranslate>iframe.goog-te-banner-frame,
+.VIpgJd-ZVi9od-ORHb-OEVmcd {
+  display: none !important;
+  visibility: hidden !important;
+}
+
+/* Hide the hover tooltip balloon */
+#goog-gt-tt,
+.goog-te-balloon-frame {
+  display: none !important;
+}
+
+/* Reset the body top margin that Google Translate injects */
+body,
+html {
+  top: 0 !important;
+  position: static !important;
+}
+
+/* Hide the main widget completely (we use a custom select) */
+#google_translate_element {
+  display: none !important;
+}
+
+/* Hide the tooltip on hover */
+.goog-text-highlight {
+  background-color: transparent !important;
+  box-shadow: none !important;
 }
