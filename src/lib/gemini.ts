@@ -20,7 +20,7 @@ function getGeminiKeys(): string[] {
 
 // Remove global tracked index to avoid Promise.all async race collisions
 // We will assign a random start index per request instead.
-const deadKeys = new Set<number>();
+const deadKeys = new Set<string>();
 
 
 /**
@@ -61,12 +61,13 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const keyIndex = (startIndex + attempt) % keys.length;
+        const currentKey = keys[keyIndex];
 
         // Skip explicitly dead keys so we don't spam 403s
-        if (deadKeys.has(keyIndex)) continue;
+        if (deadKeys.has(currentKey)) continue;
 
         try {
-            const genAI = new GoogleGenerativeAI(keys[keyIndex]);
+            const genAI = new GoogleGenerativeAI(currentKey);
             const model = genAI.getGenerativeModel({ model: GEMINI_EMBEDDING_MODEL });
             const result = await model.embedContent(text);
             return result.embedding.values;
@@ -76,7 +77,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
             if (isDeadKeyError(lastError)) {
                 console.warn(`[Embedding] Marking Key ${keyIndex + 1} as permanently dead.`);
-                deadKeys.add(keyIndex);
+                deadKeys.add(currentKey);
                 continue;
             }
 
@@ -89,6 +90,11 @@ export async function generateEmbedding(text: string): Promise<number[]> {
             continue;
         }
     }
+
+    if (deadKeys.size >= keys.length) {
+        throw new Error(`All ${keys.length} configured Gemini API keys have been marked as permanently dead (Likely 403 Forbidden/Leaked). Please update .env.local with fresh API keys.`);
+    }
+
     throw new Error(`All keys exhausted for embedding. Last error: ${lastError?.message}`);
 }
 
@@ -124,11 +130,12 @@ async function callGeminiWithFailover(prompt: string): Promise<string> {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const keyIndex = (startIndex + attempt) % keys.length;
+        const currentKey = keys[keyIndex];
 
-        if (deadKeys.has(keyIndex)) continue;
+        if (deadKeys.has(currentKey)) continue;
 
         try {
-            const genAI = new GoogleGenerativeAI(keys[keyIndex]);
+            const genAI = new GoogleGenerativeAI(currentKey);
             const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
             const result = await model.generateContent(prompt);
             const text = result.response.text().trim();
@@ -139,7 +146,7 @@ async function callGeminiWithFailover(prompt: string): Promise<string> {
 
             if (isDeadKeyError(lastError)) {
                 console.warn(`[Gemini] Marking Key ${keyIndex + 1} as permanently dead.`);
-                deadKeys.add(keyIndex);
+                deadKeys.add(currentKey);
                 continue;
             }
 
@@ -150,6 +157,11 @@ async function callGeminiWithFailover(prompt: string): Promise<string> {
             continue;
         }
     }
+
+    if (deadKeys.size >= keys.length) {
+        throw new Error(`All ${keys.length} Gemini API keys have been marked as permanently dead (Leaked/403). Please get new keys bounds inside .env.local!`);
+    }
+
     throw new Error(`All ${keys.length} Gemini API keys exhausted. Last error: ${lastError?.message}`);
 }
 

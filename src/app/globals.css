@@ -244,3 +244,38 @@ html, body {
   pointer-events: none;
   z-index: 0;
 }
+
+/* Unique AI typing indicator */
+.typing-indicator {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  height: 20px;
+}
+
+.typing-dot {
+  width: 6px;
+  height: 6px;
+  background-color: var(--accent-2);
+  border-radius: 50%;
+  animation: typingBounce 1.4s infinite ease-in-out both;
+}
+
+.typing-dot:nth-child(1) {
+  animation-delay: -0.32s;
+}
+
+.typing-dot:nth-child(2) {
+  animation-delay: -0.16s;
+}
+
+@keyframes typingBounce {
+  0%, 80%, 100% { 
+    transform: scale(0);
+    background-color: var(--accent-1);
+  }
+  40% { 
+    transform: scale(1);
+    background-color: var(--accent-3);
+  }
+}

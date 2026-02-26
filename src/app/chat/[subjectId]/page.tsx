@@ -7,6 +7,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import ErrorModal from "@/components/ErrorModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import PreviewModal from "@/components/PreviewModal";
+import MarkdownRenderer from "@/components/MarkdownRenderer";
 
 interface Citation {
   fileName: string;
@@ -33,11 +34,34 @@ interface ChatSession {
   isTyping?: boolean; // Custom flag for typewriter effect on new auto-titled chats
 }
 
+function TypewriterMessage({ content, animate }: { content: string; animate: boolean }) {
+  const [displayed, setDisplayed] = useState(animate ? "" : content);
+
+  useEffect(() => {
+    if (!animate) {
+      setDisplayed(content);
+      return;
+    }
+    let i = 0;
+    const interval = setInterval(() => {
+      setDisplayed(content.slice(0, i + 1));
+      i++;
+      if (i >= content.length) {
+        clearInterval(interval);
+      }
+    }, 12); // Speed of typewriter
+    return () => clearInterval(interval);
+  }, [content, animate]);
+
+  return <MarkdownRenderer content={displayed} />;
+}
+
 export default function ChatPage({ params }: { params: Promise<{ subjectId: string }> }) {
   const { subjectId } = use(params);
   const { status } = useSession();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState("");
@@ -463,102 +487,190 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
               </div>
             )}
 
-            {messages.map((msg) => (
+            {messages.map((msg, index) => {
+              const isLastAssistantMsg = index === messages.length - 1 && msg.role === "assistant";
+              return (
               <div
                 key={msg.id}
                 style={{
-                  ...styles.messageBubble,
+                  display: "flex",
+                  gap: 12,
                   alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
-                  background: msg.role === "user"
-                    ? "linear-gradient(135deg, #7c3aed, #3b82f6)"
-                    : msg.notFound
-                      ? "rgba(239, 68, 68, 0.1)"
-                      : "var(--bg-card)",
-                  border: msg.role === "user"
-                    ? "none"
-                    : msg.notFound
-                      ? "1px solid rgba(239, 68, 68, 0.3)"
-                      : "1px solid var(--glass-border)",
-                  maxWidth: msg.role === "user" ? "70%" : "85%",
+                  flexDirection: msg.role === "user" ? "row-reverse" : "row",
+                  maxWidth: "90%",
                 }}
                 className="animate-fade-in"
               >
-                <p style={styles.messageText}>{msg.content}</p>
+                {/* Avatar */}
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  background: msg.role === "user" ? "var(--accent-1)" : "var(--bg-card)",
+                  border: msg.role === "assistant" ? "1px solid var(--accent-2)" : "none",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  fontSize: 18,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                }}>
+                  {msg.role === "user" ? "👤" : "🤖"}
+                </div>
 
-                {/* Citations */}
-                {msg.citations && msg.citations.length > 0 && (
-                  <div style={styles.citationsSection}>
-                    <div style={styles.citationsHeader}>📎 Citations</div>
-                    {msg.citations.map((c, ci) => (
-                      <div key={ci} style={styles.citationItem}>
-                        {c.fileUrl ? (
-                          <button 
-                            onClick={() => setPreviewFile({ url: `${c.fileUrl}#page=${c.pageNumber}`, name: c.fileName })}
-                            style={styles.citationBtn}
-                            className="hover-underline"
-                            title={`Preview ${c.fileName} on page ${c.pageNumber}`}
-                          >
-                            📄 {c.fileName} — Page {c.pageNumber}, Chunk {c.chunkIndex}
-                          </button>
-                        ) : (
-                          <span>📄 {c.fileName} — Page {c.pageNumber}, Chunk {c.chunkIndex}</span>
-                        )}
-                      </div>
-                    ))}
+                <div
+                  style={{
+                    ...styles.messageBubble,
+                    position: "relative",
+                    background: msg.role === "user"
+                      ? "linear-gradient(135deg, #7c3aed, #3b82f6)"
+                      : msg.notFound
+                        ? "rgba(239, 68, 68, 0.1)"
+                        : "var(--bg-card)",
+                    border: msg.role === "user"
+                      ? "none"
+                      : msg.notFound
+                        ? "1px solid rgba(239, 68, 68, 0.3)"
+                        : "1px solid var(--glass-border)",
+                    color: msg.role === "user" ? "#ffffff" : "var(--text-primary)",
+                  }}
+                >
+                  {/* Copy to Clipboard Button */}
+                  {msg.role === "assistant" && (
+                    <button
+                      onClick={() => {
+                        navigator.clipboard.writeText(msg.content);
+                        setCopiedId(msg.id);
+                        setTimeout(() => setCopiedId(null), 2000);
+                      }}
+                      style={{
+                        position: "absolute",
+                        top: 8,
+                        right: 8,
+                        background: "rgba(255,255,255,0.05)",
+                        border: "1px solid var(--glass-border)",
+                        borderRadius: 4,
+                        color: "var(--text-secondary)",
+                        padding: "2px 6px",
+                        fontSize: 10,
+                        cursor: "pointer",
+                        opacity: 0.7,
+                        transition: "all 0.2s"
+                      }}
+                      title="Copy to clipboard"
+                    >
+                      {copiedId === msg.id ? "Copied! ✅" : "Copy 📋"}
+                    </button>
+                  )}
+
+                  <div style={{ ...styles.messageText, color: msg.role === "user" ? "#ffffff" : "var(--text-primary)" }}>
+                    {msg.role === "user" ? <MarkdownRenderer content={msg.content} /> : <TypewriterMessage content={msg.content} animate={isLastAssistantMsg} />}
                   </div>
-                )}
 
-                {/* Confidence + SHAP/LIME Explanation */}
-                {msg.confidence && (
-                  <div style={{ marginTop: 8 }}>
-                    <span className={`badge badge-${msg.confidence.toLowerCase()}`}>
-                      {msg.confidence === "High" ? "🟢" : msg.confidence === "Medium" ? "🟡" : "🔴"}{" "}
-                      {msg.confidence} Confidence
-                    </span>
-                    {msg.confidenceExplanation && (
-                      <details style={styles.confidenceDetails}>
-                        <summary style={styles.confidenceSummary}>
-                          🔬 Why this confidence? (SHAP/LIME Analysis)
-                        </summary>
-                        <pre style={styles.confidenceText}>{msg.confidenceExplanation}</pre>
-                      </details>
-                    )}
-                  </div>
-                )}
-
-                {/* Evidence snippets */}
-                {msg.evidenceSnippets && msg.evidenceSnippets.length > 0 && (
-                  <details style={styles.evidence}>
-                    <summary style={styles.evidenceSummary}>
-                      📋 Supporting Evidence ({msg.evidenceSnippets.length})
-                    </summary>
-                    <div style={styles.evidenceList}>
-                      {msg.evidenceSnippets.map((e, ei) => (
-                        <div key={ei} style={styles.evidenceItem}>
-                          &ldquo;{e}&rdquo;
+                  {/* Citations */}
+                  {msg.citations && msg.citations.length > 0 && (
+                    <div style={styles.citationsSection}>
+                      <div style={styles.citationsHeader}>📎 Citations</div>
+                      {msg.citations.map((c, ci) => (
+                        <div key={ci} style={styles.citationItem}>
+                          {c.fileUrl ? (
+                            <button 
+                              onClick={() => setPreviewFile({ url: `${c.fileUrl}#page=${c.pageNumber}`, name: c.fileName })}
+                              style={styles.citationBtn}
+                              className="hover-underline"
+                              title={`Preview ${c.fileName} on page ${c.pageNumber}`}
+                            >
+                              📄 {c.fileName} — Page {c.pageNumber}, Chunk {c.chunkIndex}
+                            </button>
+                          ) : (
+                            <span>📄 {c.fileName} — Page {c.pageNumber}, Chunk {c.chunkIndex}</span>
+                          )}
                         </div>
                       ))}
                     </div>
-                  </details>
-                )}
+                  )}
 
-                {/* Speak button */}
-                {msg.role === "assistant" && !msg.notFound && (
-                  <button
-                    onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.content)}
-                    style={styles.speakBtn}
-                    title={isSpeaking ? "Stop speaking" : "Read aloud"}
-                  >
-                    {isSpeaking ? "⏹️" : "🔊"}
-                  </button>
-                )}
+                  {/* Confidence + SHAP/LIME Explanation */}
+                  {msg.confidence && (
+                    <div style={{ marginTop: 8 }}>
+                      <span className={`badge badge-${msg.confidence.toLowerCase()}`}>
+                        {msg.confidence === "High" ? "🟢" : msg.confidence === "Medium" ? "🟡" : "🔴"}{" "}
+                        {msg.confidence} Confidence
+                      </span>
+                      {msg.confidenceExplanation && (
+                        <details style={styles.confidenceDetails}>
+                          <summary style={styles.confidenceSummary}>
+                            🔬 Why this confidence? (SHAP/LIME Analysis)
+                          </summary>
+                          <pre style={styles.confidenceText}>{msg.confidenceExplanation}</pre>
+                        </details>
+                      )}
+                    </div>
+                  )}
+
+                  {/* Evidence snippets */}
+                  {msg.evidenceSnippets && msg.evidenceSnippets.length > 0 && (
+                    <details style={styles.evidence}>
+                      <summary style={styles.evidenceSummary}>
+                        📋 Supporting Evidence ({msg.evidenceSnippets.length})
+                      </summary>
+                      <div style={styles.evidenceList}>
+                        {msg.evidenceSnippets.map((e, ei) => (
+                          <div key={ei} style={styles.evidenceItem}>
+                            &ldquo;{e}&rdquo;
+                          </div>
+                        ))}
+                      </div>
+                    </details>
+                  )}
+
+                  {/* Speak button */}
+                  {msg.role === "assistant" && !msg.notFound && (
+                    <button
+                      onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.content)}
+                      style={{...styles.speakBtn, color: "var(--text-secondary)"}}
+                      title={isSpeaking ? "Stop speaking" : "Read aloud"}
+                    >
+                      {isSpeaking ? "⏹️" : "🔊"}
+                    </button>
+                  )}
+                </div>
               </div>
-            ))}
+            )})}
 
             {loading && (
-              <div style={{ ...styles.messageBubble, alignSelf: "flex-start", background: "var(--bg-card)", border: "1px solid var(--glass-border)" }}>
-                <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <div className="spinner" /> Thinking...
+              <div
+                style={{
+                  display: "flex",
+                  gap: 12,
+                  alignItems: "center",
+                  alignSelf: "flex-start",
+                  maxWidth: "90%",
+                }}
+                className="animate-fade-in"
+              >
+                {/* AI Loading Avatar */}
+                <div style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: "50%",
+                  background: "var(--bg-card)",
+                  border: "1px solid var(--accent-2)",
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexShrink: 0,
+                  fontSize: 18,
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.2)"
+                }}>
+                  🤖
+                </div>
+                <div style={{ ...styles.messageBubble, padding: "12px 18px", background: "var(--bg-card)", border: "1px solid var(--glass-border)" }}>
+                  <div className="typing-indicator" style={{ display: "flex", alignItems: "center", height: 12 }}>
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                    <div className="typing-dot"></div>
+                  </div>
                 </div>
               </div>
             )}
