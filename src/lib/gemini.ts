@@ -578,16 +578,34 @@ export async function generateCheatsheet(
         )
         .join("\n\n---\n\n");
 
-    const prompt = `You are a study assistant. Create a highly concise, organized Markdown cheatsheet summarizing the following study material for "${subjectName}".
+    const prompt = `You are an expert study assistant and professor creating a highly structured, visually rich 'Exam Cheatsheet' summarizing the following study material for "${subjectName}".
 
 SOURCE MATERIAL:
 ${contextStr}
 
-INSTRUCTIONS:
-- Use Markdown formatting (headings, bullet points, bold text).
-- Focus only on key terms, definitions, formulas, and critical concepts.
-- Omit fluff. Keep it extremely scannable for an exam review.
-- Do NOT output json. Output pure Markdown.`;
+INSTRUCTIONS & FORMATTING:
+1. Use rich Markdown formatting: **Bold** key definitions, use nested bullet points, blockquotes (>) for important warnings, and standard Markdown Tables for comparisons.
+2. Structure the cheatsheet logically into sections (e.g., Core Concepts, Formulas/Equations, Important Dates, Key Figures).
+3. Include Mnemonic devices or "Memory Aids" where appropriate to help the student remember complex lists or sequences.
+4. Omit extra conversational fluff—keep it extremely scannable, dense, and optimized for rapid exam review.
+
+CRITICAL VISUALIZATION RULES (MERMAID JS):
+Whenever you explain a process, a hierarchy, a system architecture, or any relational concept, you MUST generate a Mermaid diagram to visualize it for the student.
+Wrap the diagram in a standard markdown code block:
+\`\`\`mermaid
+graph TD
+  ...
+\`\`\`
+
+**MERMAID RULES**:
+- Use simple graphs (e.g. \`graph TD\` or \`mindmap\`).
+- If using flowchart/graph, ALL node labels with spaces or punctuation MUST be wrapped in double quotes. 
+  - BAD: A[Start Process]
+  - GOOD: A["Start Process"]
+- Do NOT use HTML tags (like <br> or <b>) inside Mermaid node labels.
+- Do NOT use unescaped characters like (, ), or & inside Mermaid IDs or labels unless wrapped in quotes.
+
+Do NOT output pure JSON. Output a beautifully formatted Markdown string starting directly with an # h1 Title.`;
 
     const responseText = await callLLM(prompt);
     return responseText.trim();

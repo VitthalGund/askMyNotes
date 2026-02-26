@@ -470,3 +470,65 @@ html {
   background-color: transparent !important;
   box-shadow: none !important;
 }
+
+/* --- Print & PDF Export Styling --- */
+@media print {
+  /* Force a clean A4 black-and-white print payload */
+  body {
+    background: #ffffff !important;
+    color: #000000 !important;
+    font-size: 12pt !important;
+  }
+
+  /* Hide absolutely everything not strictly part of the cheatsheet payload */
+  .print-hide, nav, header, footer, button, .goog-te-banner-frame {
+    display: none !important;
+  }
+
+  /* Expand the cheatsheet layout outwards */
+  .print-container {
+    background: #ffffff !important;
+    color: #000000 !important;
+    border: none !important;
+    box-shadow: none !important;
+    width: 100% !important;
+    max-width: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+  }
+
+  /* Markdown container layout print configurations */
+  .printable-markdown {
+    color: #000000 !important;
+  }
+  
+  .printable-markdown h1, .printable-markdown h2, .printable-markdown h3 {
+    color: #000000 !important;
+    page-break-after: avoid;
+  }
+
+  .printable-markdown p, .printable-markdown li {
+    color: #2b2b2b !important;
+  }
+
+  .printable-markdown pre, .printable-markdown code {
+    white-space: pre-wrap !important;
+    word-break: break-word !important;
+    background: #f1f1f1 !important;
+    color: #000 !important;
+  }
+  
+  .printable-markdown table {
+    border-collapse: collapse !important;
+  }
+  
+  .printable-markdown th, .printable-markdown td {
+    border-color: #000000 !important;
+  }
+
+  /* Prevent blocks from breaking across document pages */
+  .printable-markdown .mermaid, .printable-markdown img, .printable-markdown table {
+    page-break-inside: avoid;
+    max-width: 100% !important;
+  }
+}

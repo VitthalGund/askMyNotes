@@ -196,16 +196,16 @@ export default function HomePage() {
           </div>
         </section>
 
-        {/* 5. VOICE TEASER */}
+        {/* 5. VOICE FEATURES LIVE */}
         <section style={styles.voiceSection}>
           <div style={styles.container}>
             <div style={styles.voiceBox}>
               <div style={styles.voiceIcon}>🎙️</div>
               <h2 style={styles.voiceTitle}>Talk to Your Notes Like a Teacher</h2>
               <p style={styles.voiceText}>
-                Phase 2 is coming. Soon you can ask questions out loud, get teacher-style explanations back, and follow up naturally with our Voice-to-Voice AI.
+                Leave the keyboard behind! You can now ask questions out loud, get teacher-style explanations spoken back to you, and converse naturally using Voice AI.
               </p>
-              <div style={styles.comingSoonBadge}>COMING SOON</div>
+              <div style={styles.liveBadge}>LIVE NOW</div>
             </div>
           </div>
         </section>
@@ -625,7 +625,7 @@ const styles: Record<string, React.CSSProperties> = {
   voiceIcon: { fontSize: "48px", marginBottom: "20px" },
   voiceTitle: { fontSize: "32px", fontWeight: 800, color: "#fff", marginBottom: "16px" },
   voiceText: { fontSize: "18px", color: "var(--text-secondary)", maxWidth: "600px", lineHeight: 1.6 },
-  comingSoonBadge: { position: "absolute", top: "-15px", background: "linear-gradient(90deg, #f59e0b, #ef4444)", color: "#fff", padding: "6px 16px", borderRadius: "20px", fontSize: "12px", fontWeight: 700, letterSpacing: "1px", boxShadow: "0 4px 10px rgba(239, 68, 68, 0.3)" },
+  liveBadge: { position: "absolute", top: "-15px", background: "linear-gradient(90deg, #10b981, #3b82f6)", color: "#fff", padding: "6px 16px", borderRadius: "20px", fontSize: "12px", fontWeight: 700, letterSpacing: "1px", boxShadow: "0 4px 10px rgba(16, 185, 129, 0.3)" },
 
   // TESTIMONIALS
   testimonialSection: { padding: "80px 0", background: "rgba(255,255,255,0.02)" },

@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import ErrorModal from "@/components/ErrorModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import PreviewModal from "@/components/PreviewModal";
+import Link from "next/link";
 import UpgradeModal from "@/components/UpgradeModal";
 
 interface Subject {
@@ -197,7 +198,7 @@ export default function DashboardPage() {
       {/* Header */}
       <header style={styles.header}>
         <div style={styles.headerLeft}>
-          <h1 style={styles.logo}>📚 AskMyNotes</h1>
+          <h1 style={styles.logo}><Link href="/home">📚 AskMyNotes</Link></h1>
         </div>
         <div style={styles.headerRight}>
           <span style={styles.greeting}>Hey, {userName} 👋</span>
