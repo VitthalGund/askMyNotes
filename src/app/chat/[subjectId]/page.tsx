@@ -25,6 +25,7 @@ interface Message {
   confidenceExplanation?: string;
   evidenceSnippets?: string[];
   notFound?: boolean;
+  isNew?: boolean;
 }
 
 interface ChatSession {
@@ -340,6 +341,7 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
         confidenceExplanation: data.confidenceExplanation || "",
         evidenceSnippets: data.evidenceSnippets || [],
         notFound: data.notFound || false,
+        isNew: true,
       };
 
       setMessages((prev) => [...prev, assistantMsg]);
@@ -349,7 +351,7 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
     } catch {
       setMessages((prev) => [
         ...prev,
-        { id: crypto.randomUUID(), role: "assistant", content: "Failed to get response. Please try again." },
+        { id: crypto.randomUUID(), role: "assistant", content: "Failed to get response. Please try again.", isNew: true },
       ]);
     } finally {
       setLoading(false);
@@ -487,12 +489,13 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
               </div>
             )}
 
-            {messages.map((msg, index) => {
-              const isLastAssistantMsg = index === messages.length - 1 && msg.role === "assistant";
+            {messages.map((msg) => {
               return (
               <div
                 key={msg.id}
                 style={{
+                  ...styles.messageRow,
+                  justifyContent: msg.role === "user" ? "flex-end" : "flex-start",
                   display: "flex",
                   gap: 12,
                   alignSelf: msg.role === "user" ? "flex-end" : "flex-start",
@@ -535,37 +538,55 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
                     color: msg.role === "user" ? "#ffffff" : "var(--text-primary)",
                   }}
                 >
-                  {/* Copy to Clipboard Button */}
-                  {msg.role === "assistant" && (
-                    <button
-                      onClick={() => {
-                        navigator.clipboard.writeText(msg.content);
-                        setCopiedId(msg.id);
-                        setTimeout(() => setCopiedId(null), 2000);
-                      }}
-                      style={{
-                        position: "absolute",
-                        top: 8,
-                        right: 8,
-                        background: "rgba(255,255,255,0.05)",
-                        border: "1px solid var(--glass-border)",
-                        borderRadius: 4,
-                        color: "var(--text-secondary)",
-                        padding: "2px 6px",
-                        fontSize: 10,
-                        cursor: "pointer",
-                        opacity: 0.7,
-                        transition: "all 0.2s"
-                      }}
-                      title="Copy to clipboard"
-                    >
-                      {copiedId === msg.id ? "Copied! ✅" : "Copy 📋"}
-                    </button>
-                  )}
+
 
                   <div style={{ ...styles.messageText, color: msg.role === "user" ? "#ffffff" : "var(--text-primary)" }}>
-                    {msg.role === "user" ? <MarkdownRenderer content={msg.content} /> : <TypewriterMessage content={msg.content} animate={isLastAssistantMsg} />}
+                    {msg.role === "user" ? <MarkdownRenderer content={msg.content} /> : <TypewriterMessage content={msg.content} animate={msg.isNew || false} />}
                   </div>
+
+                  {/* Action Buttons Bottom */}
+                  {msg.role === "assistant" && (
+                    <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", marginTop: 8 }}>
+                      {!msg.notFound && (
+                        <button
+                          onClick={() => isSpeaking ? stopSpeaking() : speakText(msg.content)}
+                          style={{
+                            background: "rgba(255,255,255,0.05)",
+                            border: "1px solid var(--glass-border)",
+                            borderRadius: 4,
+                            color: "var(--text-secondary)",
+                            padding: "4px 8px",
+                            fontSize: 12,
+                            cursor: "pointer",
+                            transition: "all 0.2s"
+                          }}
+                          title={isSpeaking ? "Stop speaking" : "Read aloud"}
+                        >
+                          {isSpeaking ? "⏹️ Stop" : "🔊 Read"}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          navigator.clipboard.writeText(msg.content);
+                          setCopiedId(msg.id);
+                          setTimeout(() => setCopiedId(null), 2000);
+                        }}
+                        style={{
+                          background: "rgba(255,255,255,0.05)",
+                          border: "1px solid var(--glass-border)",
+                          borderRadius: 4,
+                          color: "var(--text-secondary)",
+                          padding: "4px 8px",
+                          fontSize: 12,
+                          cursor: "pointer",
+                          transition: "all 0.2s"
+                        }}
+                        title="Copy to clipboard"
+                      >
+                        {copiedId === msg.id ? "Copied! ✅" : "Copy 📋"}
+                      </button>
+                    </div>
+                  )}
 
                   {/* Citations */}
                   {msg.citations && msg.citations.length > 0 && (

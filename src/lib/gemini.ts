@@ -321,6 +321,7 @@ RULES:
 3. Rate your confidence as High, Medium, or Low. ${simHint}
 4. Extract the key evidence snippets you used
 5. Explain WHY you assigned that confidence level
+6. Format your answer with rich Markdown. USE tables, lists, and \`\`\`mermaid\`\`\` diagrams abundantly to visually explain complex concepts!
 
 SOURCE MATERIAL:
 ${contextStr}
@@ -329,9 +330,9 @@ ${historyStr ? `CONVERSATION HISTORY:\n${historyStr}\n` : ""}
 
 STUDENT'S QUESTION: ${query}
 
-Respond in this EXACT JSON format (no markdown, no code fences):
+Respond in this EXACT JSON format (the outer container must be raw JSON):
 {
-  "answer": "Your detailed answer here with [Source N] citations inline",
+  "answer": "Your detailed answer here with [Source N] citations inline. Use markdown and mermaid charts heavily inside this string. Ensure newlines are escaped correctly.",
   "citedSources": [1, 2],
   "confidence": "High",
   "confidenceReason": "Brief explanation why this confidence level was assigned",
@@ -342,7 +343,15 @@ Respond in this EXACT JSON format (no markdown, no code fences):
     const responseText = await callLLM(prompt);
 
     try {
-        const cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        let cleaned = responseText;
+        // Attempt to strictly extract a JSON object ignoring pre-text or post-text reasoning outputted by Ollama
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            cleaned = jsonMatch[0];
+        } else {
+            cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        }
+
         const parsed = JSON.parse(cleaned);
 
         if (parsed.notFound || parsed.answer.includes("Not found in your notes")) {
@@ -373,7 +382,7 @@ Respond in this EXACT JSON format (no markdown, no code fences):
             answer: parsed.answer || responseText,
             citations,
             confidence: conf,
-            confidenceExplanation: `${shapExplanation}\n\nLLM reasoning: ${llmReason}`,
+            confidenceExplanation: `${shapExplanation}\n\nAI reasoning: ${llmReason}`,
             evidenceSnippets: parsed.evidenceSnippets || [],
             notFound: false,
         };
