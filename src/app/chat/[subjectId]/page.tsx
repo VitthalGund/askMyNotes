@@ -8,6 +8,7 @@ import ErrorModal from "@/components/ErrorModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import PreviewModal from "@/components/PreviewModal";
 import MarkdownRenderer from "@/components/MarkdownRenderer";
+import UpgradeModal from "@/components/UpgradeModal";
 
 interface Citation {
   fileName: string;
@@ -79,6 +80,10 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
   const [chatToDelete, setChatToDelete] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ url: string | null; name: string } | null>(null);
+
+  // Upgrade Modal State
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeFeatureBlocked, setUpgradeFeatureBlocked] = useState<"subject" | "question">("question");
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isListening, setIsListening] = useState(false);
@@ -331,6 +336,14 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
       });
 
       const data = await res.json();
+
+      if (res.status === 403 && data.reason === "limit_exceeded") {
+         setUpgradeFeatureBlocked(data.feature || "question");
+         setIsUpgradeModalOpen(true);
+         // Remove the optimistically added user message
+         setMessages((prev) => prev.slice(0, -1));
+         return;
+      }
 
       const assistantMsg: Message = {
         id: crypto.randomUUID(),
@@ -753,6 +766,12 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
         fileUrl={previewFile?.url || null}
         fileName={previewFile?.name || ""}
         onClose={() => setPreviewFile(null)}
+      />
+
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        featureBlocked={upgradeFeatureBlocked}
       />
 
       {/* Sidebar hover & typewriter animations */}

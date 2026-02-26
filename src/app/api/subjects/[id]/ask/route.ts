@@ -5,6 +5,7 @@ import dbConnect from "@/lib/mongodb";
 import Subject from "@/models/Subject";
 import ChatSession from "@/models/ChatSession";
 import ChatMessage from "@/models/ChatMessage";
+import User from "@/models/User";
 import { retrieveRelevantChunks } from "@/lib/rag";
 import { generateAnswer } from "@/lib/gemini";
 
@@ -42,6 +43,42 @@ export async function POST(
         const chatSession = await ChatSession.findOne({ _id: chatSessionId, subjectId: id, userId });
         if (!chatSession) {
             return NextResponse.json({ error: "Chat session not found" }, { status: 404 });
+        }
+
+        const user = await User.findById(userId);
+        const tier = user?.tier || 'free';
+
+        const tierLimits: Record<string, number> = {
+            free: 10,
+            basic: 100,
+            standard: Infinity,
+            premium: Infinity
+        };
+        const maxLimit = tierLimits[tier] || 10;
+
+        // Reset usage if it's a new month
+        const now = new Date();
+        const lastReset = user?.lastQuestionReset || new Date(0);
+        let questionsAsked = user?.questionsAsked || 0;
+
+        if (now.getMonth() !== lastReset.getMonth() || now.getFullYear() !== lastReset.getFullYear()) {
+            questionsAsked = 0;
+            if (user) {
+                user.questionsAsked = 0;
+                user.lastQuestionReset = now;
+                await user.save();
+            }
+        }
+
+        if (questionsAsked >= maxLimit) {
+            return NextResponse.json(
+                {
+                    error: `Maximum matching ${maxLimit} questions allowed per month for the ${tier} tier. Upgrade to keep asking.`,
+                    reason: 'limit_exceeded',
+                    feature: 'question'
+                },
+                { status: 403 }
+            );
         }
 
         // Save user message
@@ -95,6 +132,11 @@ export async function POST(
         if (chatSession.title === "New Chat") {
             const shortTitle = question.trim().slice(0, 50) + (question.trim().length > 50 ? "..." : "");
             await ChatSession.findByIdAndUpdate(chatSessionId, { title: shortTitle });
+        }
+
+        if (user) {
+            user.questionsAsked += 1;
+            await user.save();
         }
 
         return NextResponse.json(result);

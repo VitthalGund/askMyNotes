@@ -6,8 +6,7 @@ import { useRouter } from "next/navigation";
 import ErrorModal from "@/components/ErrorModal";
 import ConfirmModal from "@/components/ConfirmModal";
 import PreviewModal from "@/components/PreviewModal";
-
-
+import UpgradeModal from "@/components/UpgradeModal";
 
 interface Subject {
   _id: string;
@@ -27,6 +26,8 @@ export default function DashboardPage() {
   const { data: session, status } = useSession();
   const router = useRouter();
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [subjectLimit, setSubjectLimit] = useState<number>(1);
+  const [userTier, setUserTier] = useState<string>("free");
   const [subjectDocs, setSubjectDocs] = useState<Record<string, DocInfo[]>>({});
   const [newSubjectName, setNewSubjectName] = useState("");
   const [loading, setLoading] = useState(true);
@@ -42,6 +43,10 @@ export default function DashboardPage() {
   const [isDeletingDoc, setIsDeletingDoc] = useState(false);
   const [previewFile, setPreviewFile] = useState<{ url: string | null; name: string } | null>(null);
 
+  // Upgrade Modal State
+  const [isUpgradeModalOpen, setIsUpgradeModalOpen] = useState(false);
+  const [upgradeFeatureBlocked, setUpgradeFeatureBlocked] = useState<"subject" | "question">("subject");
+
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
   }, [status, router]);
@@ -51,6 +56,9 @@ export default function DashboardPage() {
       const res = await fetch("/api/subjects");
       const data = await res.json();
       setSubjects(data.subjects || []);
+      if (data.limit !== undefined) setSubjectLimit(data.limit);
+      if (data.tier) setUserTier(data.tier);
+      
       // Fetch docs for each subject
       for (const sub of data.subjects || []) {
         fetchDocs(sub._id);
@@ -92,7 +100,13 @@ export default function DashboardPage() {
         fetchSubjects();
       } else {
         const data = await res.json();
-        setErrorMsg(data.error || "Failed to create subject");
+        if (res.status === 403 && data.reason === "limit_exceeded") {
+          setUpgradeFeatureBlocked(data.feature || "subject");
+          setIsUpgradeModalOpen(true);
+          setShowCreate(false);
+        } else {
+          setErrorMsg(data.error || "Failed to create subject");
+        }
       }
     } catch {
       setErrorMsg("Failed to create subject");
@@ -198,7 +212,7 @@ export default function DashboardPage() {
         <div style={styles.sectionHeader}>
           <div>
             <h2 style={styles.sectionTitle}>Your Subjects</h2>
-            <p style={styles.sectionSub}>{subjects.length}/3 subjects created</p>
+            <p style={styles.sectionSub}>{subjects.length}/{subjectLimit} subjects created ({userTier} tier)</p>
           </div>
           {subjects.length < 3 && (
             <button onClick={() => setShowCreate(true)} className="btn-gradient">
@@ -235,7 +249,7 @@ export default function DashboardPage() {
             <div style={{ fontSize: 48, marginBottom: 16 }}>📖</div>
             <h3 style={{ fontSize: 18, marginBottom: 8 }}>No subjects yet</h3>
             <p style={{ color: 'var(--text-secondary)', fontSize: 14, marginBottom: 20 }}>
-              Create up to 3 subjects and upload your study notes to get started.
+              Create up to {subjectLimit} subjects and upload your study notes to get started.
             </p>
             <button onClick={() => setShowCreate(true)} className="btn-gradient">
               + Create Your First Subject
@@ -384,6 +398,12 @@ export default function DashboardPage() {
         fileUrl={previewFile?.url || null}
         fileName={previewFile?.name || ""}
         onClose={() => setPreviewFile(null)}
+      />
+
+      <UpgradeModal
+        isOpen={isUpgradeModalOpen}
+        onClose={() => setIsUpgradeModalOpen(false)}
+        featureBlocked={upgradeFeatureBlocked}
       />
 
     </div>

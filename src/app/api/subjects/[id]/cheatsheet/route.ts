@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import Subject from "@/models/Subject";
+import User from "@/models/User";
 import { retrieveAllChunks } from "@/lib/rag";
 import { generateCheatsheet } from "@/lib/gemini";
 
@@ -20,10 +21,23 @@ export async function POST(
         const userId = (session.user as { id: string }).id;
         const { id } = await params;
 
+
         // Verify subject belongs to user
         const subject = await Subject.findOne({ _id: id, userId });
         if (!subject) {
             return NextResponse.json({ error: "Subject not found" }, { status: 404 });
+        }
+
+        const user = await User.findById(userId);
+        if (user?.tier === 'free') {
+            return NextResponse.json(
+                {
+                    error: "Study Mode is not available on the Free tier. Upgrade to unlock.",
+                    reason: 'limit_exceeded',
+                    feature: 'question'
+                },
+                { status: 403 }
+            );
         }
 
         // Get all chunks for the subject
