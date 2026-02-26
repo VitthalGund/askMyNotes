@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import Subject from "@/models/Subject";
+import ChatSession from "@/models/ChatSession";
 import ChatMessage from "@/models/ChatMessage";
 import { retrieveRelevantChunks } from "@/lib/rag";
 import { generateAnswer } from "@/lib/gemini";
@@ -17,14 +18,14 @@ export async function POST(
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { question, sessionId } = await req.json();
+        const { question, chatSessionId } = await req.json();
 
         if (!question || !question.trim()) {
             return NextResponse.json({ error: "Question is required" }, { status: 400 });
         }
 
-        if (!sessionId) {
-            return NextResponse.json({ error: "Session ID is required" }, { status: 400 });
+        if (!chatSessionId) {
+            return NextResponse.json({ error: "Chat session ID is required" }, { status: 400 });
         }
 
         await dbConnect();
@@ -37,11 +38,18 @@ export async function POST(
             return NextResponse.json({ error: "Subject not found" }, { status: 404 });
         }
 
+        // Verify chat session belongs to user and subject
+        const chatSession = await ChatSession.findOne({ _id: chatSessionId, subjectId: id, userId });
+        if (!chatSession) {
+            return NextResponse.json({ error: "Chat session not found" }, { status: 404 });
+        }
+
         // Save user message
         await ChatMessage.create({
             subjectId: id,
             userId,
-            sessionId,
+            sessionId: "",
+            chatSessionId,
             role: "user",
             content: question.trim(),
             citations: [],
@@ -49,8 +57,8 @@ export async function POST(
             evidenceSnippets: [],
         });
 
-        // Get conversation history for multi-turn (last 10 messages)
-        const history = await ChatMessage.find({ subjectId: id, userId, sessionId })
+        // Get conversation history for multi-turn (last 10 messages in this chat)
+        const history = await ChatMessage.find({ chatSessionId })
             .sort({ createdAt: -1 })
             .limit(10);
 
@@ -58,7 +66,7 @@ export async function POST(
             .reverse()
             .map((m) => ({ role: m.role, content: m.content }));
 
-        // Retrieve relevant chunks
+        // Retrieve relevant chunks from subject documents
         const chunks = await retrieveRelevantChunks(id, question.trim(), 10);
 
         // Generate answer
@@ -73,13 +81,23 @@ export async function POST(
         await ChatMessage.create({
             subjectId: id,
             userId,
-            sessionId,
+            sessionId: "",
+            chatSessionId,
             role: "assistant",
             content: result.answer,
             citations: result.citations,
             confidence: result.confidence,
             evidenceSnippets: result.evidenceSnippets,
         });
+
+        // Update chat session timestamp so it sorts to top
+        await ChatSession.findByIdAndUpdate(chatSessionId, { updatedAt: new Date() });
+
+        // Auto-title: if chat is still "New Chat" and this is the first question, set title
+        if (chatSession.title === "New Chat") {
+            const shortTitle = question.trim().slice(0, 50) + (question.trim().length > 50 ? "..." : "");
+            await ChatSession.findByIdAndUpdate(chatSessionId, { title: shortTitle });
+        }
 
         return NextResponse.json(result);
     } catch (error: unknown) {

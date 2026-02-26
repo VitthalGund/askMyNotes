@@ -3,7 +3,8 @@
 import { useState, useEffect, useCallback } from "react";
 import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { v4 as uuidv4 } from "uuid";
+
+
 
 interface Subject {
   _id: string;
@@ -290,8 +291,7 @@ export default function DashboardPage() {
                   <div style={styles.actions}>
                     <button
                       onClick={() => {
-                        const sid = uuidv4();
-                        router.push(`/chat/${sub._id}?session=${sid}`);
+                        router.push(`/chat/${sub._id}`);
                       }}
                       className="btn-gradient"
                       style={{ flex: 1 }}

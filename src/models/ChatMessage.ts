@@ -10,6 +10,7 @@ export interface IChatMessageDoc extends Document {
     subjectId: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;
     sessionId: string;
+    chatSessionId?: mongoose.Types.ObjectId;
     role: "user" | "assistant";
     content: string;
     citations: ICitationDoc[];
@@ -41,7 +42,11 @@ const ChatMessageSchema = new Schema<IChatMessageDoc>(
         },
         sessionId: {
             type: String,
-            required: true,
+            default: "",
+        },
+        chatSessionId: {
+            type: Schema.Types.ObjectId,
+            ref: "ChatSession",
         },
         role: {
             type: String,
@@ -67,6 +72,7 @@ const ChatMessageSchema = new Schema<IChatMessageDoc>(
 
 // Index for fetching conversation history
 ChatMessageSchema.index({ subjectId: 1, sessionId: 1, createdAt: 1 });
+ChatMessageSchema.index({ chatSessionId: 1, createdAt: 1 });
 
 const ChatMessage: Model<IChatMessageDoc> =
     mongoose.models.ChatMessage ||
