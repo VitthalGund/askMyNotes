@@ -409,7 +409,8 @@ Respond in this EXACT JSON format (no markdown, no code fences):
  */
 export async function generateQuiz(
     chunks: ChunkWithMeta[],
-    subjectName: string
+    subjectName: string,
+    difficulty: string = "medium"
 ): Promise<QuizResult> {
     const contextStr = chunks
         .map(
@@ -418,7 +419,14 @@ export async function generateQuiz(
         )
         .join("\n\n---\n\n");
 
+    const difficultyInstruction = difficulty === "adaptive" || difficulty === "increasing"
+        ? "Start with basic foundational questions and progressively make each question harder (increasing difficulty level)."
+        : `Generate questions appropriate for a '${difficulty}' difficulty level.`;
+
     const prompt = `You are a study assistant. Generate quiz questions from the following study material for the subject "${subjectName}".
+
+DIFFICULTY NOTE:
+${difficultyInstruction}
 
 SOURCE MATERIAL:
 ${contextStr}
@@ -491,4 +499,85 @@ Respond in this EXACT JSON format (no markdown, no code fences):
     } catch {
         return { mcqs: [], shortAnswer: [] };
     }
+}
+
+/**
+ * Generate active recall flashcards from context chunks
+ */
+export async function generateActiveRecall(
+    chunks: ChunkWithMeta[],
+    subjectName: string
+): Promise<{ question: string; answer: string; citation: { fileName: string; pageNumber: number; chunkIndex: number } }[]> {
+    const contextStr = chunks
+        .map(
+            (c, i) =>
+                `[Source ${i + 1}: ${c.fileName}, Page ${c.pageNumber}, Chunk ${c.chunkIndex}]\n${c.content}`
+        )
+        .join("\n\n---\n\n");
+
+    const prompt = `You are a study assistant creating an Active Recall session. Generate 5 rapid-fire flashcard questions based on the following material for "${subjectName}".
+
+SOURCE MATERIAL:
+${contextStr}
+
+Generate EXACTLY 5 quick, single-concept questions and their concise answers.
+
+Respond in this EXACT JSON format:
+[
+  {
+    "question": "What is...",
+    "answer": "A concise answer...",
+    "citedSource": 1
+  }
+]`;
+
+    const responseText = await callLLM(prompt);
+
+    try {
+        const cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        const parsed = JSON.parse(cleaned);
+
+        return parsed.map((q: any) => ({
+            question: q.question,
+            answer: q.answer,
+            citation: q.citedSource >= 1 && q.citedSource <= chunks.length
+                ? {
+                    fileName: chunks[q.citedSource - 1].fileName,
+                    pageNumber: chunks[q.citedSource - 1].pageNumber,
+                    chunkIndex: chunks[q.citedSource - 1].chunkIndex,
+                }
+                : { fileName: "Unknown", pageNumber: 0, chunkIndex: 0 },
+        }));
+    } catch {
+        return [];
+    }
+}
+
+/**
+ * Generate a concise cheatsheet from context chunks
+ */
+export async function generateCheatsheet(
+    chunks: ChunkWithMeta[],
+    subjectName: string
+): Promise<string> {
+    const contextStr = chunks
+        .map(
+            (c, i) =>
+                `[Source ${i + 1}: ${c.fileName}, Page ${c.pageNumber}]\n${c.content}`
+        )
+        .join("\n\n---\n\n");
+
+    const prompt = `You are a study assistant. Create a highly concise, organized Markdown cheatsheet summarizing the following study material for "${subjectName}".
+
+SOURCE MATERIAL:
+${contextStr}
+
+INSTRUCTIONS:
+- Use Markdown formatting (headings, bullet points, bold text).
+- Focus only on key terms, definitions, formulas, and critical concepts.
+- Omit fluff. Keep it extremely scannable for an exam review.
+- Do NOT output json. Output pure Markdown.`;
+
+    const responseText = await callLLM(prompt);
+    return responseText.trim();
 }

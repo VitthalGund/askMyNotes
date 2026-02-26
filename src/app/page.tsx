@@ -9,7 +9,7 @@ export default function Home() {
 
   useEffect(() => {
     if (status === "authenticated") {
-      redirect("/dashboard");
+      redirect("/home");
     } else if (status === "unauthenticated") {
       redirect("/login");
     }

@@ -36,11 +36,22 @@ export async function POST(
             );
         }
 
+        // Parse difficulty from request body
+        let difficulty = "medium";
+        try {
+            const body = await _req.json();
+            if (body && body.difficulty) {
+                difficulty = body.difficulty;
+            }
+        } catch {
+            // Ignore if no body or invalid json
+        }
+
         // Limit chunks to avoid token limits (take first 30 chunks or ~15000 words)
         const limitedChunks = allChunks.slice(0, 30);
 
         // Generate quiz
-        const quiz = await generateQuiz(limitedChunks, subject.name);
+        const quiz = await generateQuiz(limitedChunks, subject.name, difficulty);
 
         return NextResponse.json(quiz);
     } catch (error: unknown) {
