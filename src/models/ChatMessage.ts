@@ -23,6 +23,7 @@ export interface IChatMessageDoc extends Document {
 const CitationSchema = new Schema<ICitationDoc>(
     {
         fileName: { type: String, required: true },
+        fileUrl: { type: String, required: false },
         pageNumber: { type: Number, required: true },
         chunkIndex: { type: Number, required: true },
     },

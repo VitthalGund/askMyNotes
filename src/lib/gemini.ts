@@ -3,7 +3,7 @@ import { GoogleGenerativeAI } from "@google/generative-ai";
 // ─── Multi-Key Gemini + Ollama LLM Client ────────────────────────────────
 
 const LLM_PROVIDER = process.env.LLM_PROVIDER || "gemini";
-const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.0-flash-lite";
+const GEMINI_MODEL = process.env.GEMINI_MODEL || "gemini-2.5-flash-lite";
 const GEMINI_EMBEDDING_MODEL = process.env.GEMINI_EMBEDDING_MODEL || "gemini-embedding-001";
 const OLLAMA_BASE_URL = process.env.OLLAMA_BASE_URL || "http://localhost:11434";
 const OLLAMA_MODEL = process.env.OLLAMA_MODEL || "llama3.2:1b";
@@ -20,7 +20,7 @@ function getGeminiKeys(): string[] {
 
 // Remove global tracked index to avoid Promise.all async race collisions
 // We will assign a random start index per request instead.
-const deadKeys = new Set<number>();
+const deadKeys = new Set<string>();
 
 
 /**
@@ -61,12 +61,13 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const keyIndex = (startIndex + attempt) % keys.length;
+        const currentKey = keys[keyIndex];
 
         // Skip explicitly dead keys so we don't spam 403s
-        if (deadKeys.has(keyIndex)) continue;
+        if (deadKeys.has(currentKey)) continue;
 
         try {
-            const genAI = new GoogleGenerativeAI(keys[keyIndex]);
+            const genAI = new GoogleGenerativeAI(currentKey);
             const model = genAI.getGenerativeModel({ model: GEMINI_EMBEDDING_MODEL });
             const result = await model.embedContent(text);
             return result.embedding.values;
@@ -76,7 +77,7 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
             if (isDeadKeyError(lastError)) {
                 console.warn(`[Embedding] Marking Key ${keyIndex + 1} as permanently dead.`);
-                deadKeys.add(keyIndex);
+                deadKeys.add(currentKey);
                 continue;
             }
 
@@ -89,6 +90,11 @@ export async function generateEmbedding(text: string): Promise<number[]> {
             continue;
         }
     }
+
+    if (deadKeys.size >= keys.length) {
+        throw new Error(`All ${keys.length} configured Gemini API keys have been marked as permanently dead (Likely 403 Forbidden/Leaked). Please update .env.local with fresh API keys.`);
+    }
+
     throw new Error(`All keys exhausted for embedding. Last error: ${lastError?.message}`);
 }
 
@@ -124,11 +130,12 @@ async function callGeminiWithFailover(prompt: string): Promise<string> {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const keyIndex = (startIndex + attempt) % keys.length;
+        const currentKey = keys[keyIndex];
 
-        if (deadKeys.has(keyIndex)) continue;
+        if (deadKeys.has(currentKey)) continue;
 
         try {
-            const genAI = new GoogleGenerativeAI(keys[keyIndex]);
+            const genAI = new GoogleGenerativeAI(currentKey);
             const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
             const result = await model.generateContent(prompt);
             const text = result.response.text().trim();
@@ -139,7 +146,7 @@ async function callGeminiWithFailover(prompt: string): Promise<string> {
 
             if (isDeadKeyError(lastError)) {
                 console.warn(`[Gemini] Marking Key ${keyIndex + 1} as permanently dead.`);
-                deadKeys.add(keyIndex);
+                deadKeys.add(currentKey);
                 continue;
             }
 
@@ -150,6 +157,11 @@ async function callGeminiWithFailover(prompt: string): Promise<string> {
             continue;
         }
     }
+
+    if (deadKeys.size >= keys.length) {
+        throw new Error(`All ${keys.length} Gemini API keys have been marked as permanently dead (Leaked/403). Please get new keys bounds inside .env.local!`);
+    }
+
     throw new Error(`All ${keys.length} Gemini API keys exhausted. Last error: ${lastError?.message}`);
 }
 
@@ -309,6 +321,9 @@ RULES:
 3. Rate your confidence as High, Medium, or Low. ${simHint}
 4. Extract the key evidence snippets you used
 5. Explain WHY you assigned that confidence level
+6. Format your answer with rich Markdown. USE tables, lists, and \`\`\`mermaid\`\`\` diagrams abundantly to visually explain complex concepts!
+7. MERMAID RULES: You MUST use valid Mermaid syntax. ALWAYS wrap textual node labels in double quotes (e.g. \`A["Node Label (Extra Info)"]\`). Do NOT use unescaped special characters or raw HTML tags inside node text. Use standard layouts like \`flowchart TD\` or \`flowchart LR\`.
+8. MULTILINGUAL: You MUST detect the language used in the STUDENT'S QUESTION. Your entire response (answer, reasons, etc) MUST be written in that exact same language.
 
 SOURCE MATERIAL:
 ${contextStr}
@@ -317,9 +332,9 @@ ${historyStr ? `CONVERSATION HISTORY:\n${historyStr}\n` : ""}
 
 STUDENT'S QUESTION: ${query}
 
-Respond in this EXACT JSON format (no markdown, no code fences):
+Respond in this EXACT JSON format (the outer container must be raw JSON):
 {
-  "answer": "Your detailed answer here with [Source N] citations inline",
+  "answer": "Your detailed answer here with [Source N] citations inline. Use markdown and mermaid charts heavily inside this string. Ensure newlines are escaped correctly.",
   "citedSources": [1, 2],
   "confidence": "High",
   "confidenceReason": "Brief explanation why this confidence level was assigned",
@@ -330,7 +345,15 @@ Respond in this EXACT JSON format (no markdown, no code fences):
     const responseText = await callLLM(prompt);
 
     try {
-        const cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        let cleaned = responseText;
+        // Attempt to strictly extract a JSON object ignoring pre-text or post-text reasoning outputted by Ollama
+        const jsonMatch = responseText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+            cleaned = jsonMatch[0];
+        } else {
+            cleaned = responseText.replace(/```json\n?/g, "").replace(/```\n?/g, "").trim();
+        }
+
         const parsed = JSON.parse(cleaned);
 
         if (parsed.notFound || parsed.answer.includes("Not found in your notes")) {
@@ -361,7 +384,7 @@ Respond in this EXACT JSON format (no markdown, no code fences):
             answer: parsed.answer || responseText,
             citations,
             confidence: conf,
-            confidenceExplanation: `${shapExplanation}\n\nLLM reasoning: ${llmReason}`,
+            confidenceExplanation: `${shapExplanation}\n\nAI reasoning: ${llmReason}`,
             evidenceSnippets: parsed.evidenceSnippets || [],
             notFound: false,
         };
