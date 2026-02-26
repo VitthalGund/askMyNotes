@@ -322,6 +322,8 @@ RULES:
 4. Extract the key evidence snippets you used
 5. Explain WHY you assigned that confidence level
 6. Format your answer with rich Markdown. USE tables, lists, and \`\`\`mermaid\`\`\` diagrams abundantly to visually explain complex concepts!
+7. MERMAID RULES: You MUST use valid Mermaid syntax. ALWAYS wrap textual node labels in double quotes (e.g. \`A["Node Label (Extra Info)"]\`). Do NOT use unescaped special characters or raw HTML tags inside node text. Use standard layouts like \`flowchart TD\` or \`flowchart LR\`.
+8. MULTILINGUAL: You MUST detect the language used in the STUDENT'S QUESTION. Your entire response (answer, reasons, etc) MUST be written in that exact same language.
 
 SOURCE MATERIAL:
 ${contextStr}

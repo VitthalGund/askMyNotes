@@ -11,6 +11,7 @@ mermaid.initialize({
 
 function MermaidChart({ chart }: { chart: string }) {
   const [svg, setSvg] = useState<string>('');
+  const [isFullscreen, setIsFullscreen] = useState(false);
   const idRef = useRef<string>('');
 
   useEffect(() => {
@@ -27,7 +28,108 @@ function MermaidChart({ chart }: { chart: string }) {
     return () => { isMounted = false; };
   }, [chart]);
 
-  return <div dangerouslySetInnerHTML={{ __html: svg }} style={{ background: 'rgba(0,0,0,0.2)', padding: 16, borderRadius: 8, overflowX: 'auto', textAlign: 'center', margin: '12px 0' }} />;
+  return (
+    <>
+      <div style={{ position: 'relative', margin: '12px 0' }}>
+        <div 
+          dangerouslySetInnerHTML={{ __html: svg }} 
+          style={{ background: 'rgba(0,0,0,0.2)', padding: 16, borderRadius: 8, overflowX: 'auto', textAlign: 'center' }} 
+        />
+        <button
+          onClick={() => setIsFullscreen(true)}
+          style={{
+            position: 'absolute',
+            top: 8,
+            right: 8,
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--glass-border)',
+            borderRadius: 4,
+            padding: '4px 8px',
+            color: 'var(--text-secondary)',
+            cursor: 'pointer',
+            fontSize: 12
+          }}
+          title="View Fullscreen"
+        >
+          ⛶
+        </button>
+      </div>
+
+      {isFullscreen && (
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'rgba(0,0,0,0.9)',
+          zIndex: 9999,
+          display: 'flex',
+          justifyContent: 'center',
+          alignItems: 'center',
+          overflow: 'auto',
+          padding: 24
+        }}>
+          <button
+            onClick={() => setIsFullscreen(false)}
+            style={{
+              position: 'fixed',
+              top: 24,
+              right: 24,
+              background: 'rgba(255,255,255,0.1)',
+              border: '1px solid var(--glass-border)',
+              borderRadius: '50%',
+              width: 44,
+              height: 44,
+              color: 'var(--text-primary)',
+              cursor: 'pointer',
+              fontSize: 20,
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              backdropFilter: 'blur(10px)',
+              transition: 'all 0.2s',
+              zIndex: 10000
+            }}
+            title="Close Fullscreen"
+            onMouseOver={(e) => e.currentTarget.style.background = 'rgba(239, 68, 68, 0.2)'}
+            onMouseOut={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+          >
+            ✕
+          </button>
+          
+          <div style={{
+            background: 'var(--bg-primary)',
+            border: '1px solid var(--glass-border)',
+            borderRadius: 16,
+            padding: 40,
+            width: '90vw',
+            height: '90vh',
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            boxShadow: '0 20px 40px rgba(0,0,0,0.5)',
+            position: 'relative',
+            overflow: 'hidden'
+          }}>
+             <div 
+              dangerouslySetInnerHTML={{ __html: svg }} 
+              style={{
+                width: '100%',
+                height: '100%',
+                overflow: 'auto',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                textAlign: 'center'
+              }} 
+            />
+          </div>
+        </div>
+      )}
+    </>
+  );
 }
 
 export default function MarkdownRenderer({ content }: { content: string }) {
