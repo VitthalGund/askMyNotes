@@ -48,7 +48,6 @@ export async function POST(
         await ChatMessage.create({
             subjectId: id,
             userId,
-            sessionId: "",
             chatSessionId,
             role: "user",
             content: question.trim(),
@@ -81,7 +80,6 @@ export async function POST(
         await ChatMessage.create({
             subjectId: id,
             userId,
-            sessionId: "",
             chatSessionId,
             role: "assistant",
             content: result.answer,

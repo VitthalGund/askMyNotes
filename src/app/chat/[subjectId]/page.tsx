@@ -4,6 +4,9 @@ import { useState, useEffect, useRef, use, useCallback } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 
+import ErrorModal from "@/components/ErrorModal";
+import ConfirmModal from "@/components/ConfirmModal";
+
 interface Citation {
   fileName: string;
   pageNumber: number;
@@ -25,6 +28,7 @@ interface ChatSession {
   _id: string;
   title: string;
   updatedAt: string;
+  isTyping?: boolean; // Custom flag for typewriter effect on new auto-titled chats
 }
 
 export default function ChatPage({ params }: { params: Promise<{ subjectId: string }> }) {
@@ -43,6 +47,11 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
   const [editingChatId, setEditingChatId] = useState<string | null>(null);
   const [editTitle, setEditTitle] = useState("");
   const [creatingChat, setCreatingChat] = useState(false);
+  
+  // Custom Modal states
+  const [errorMsg, setErrorMsg] = useState("");
+  const [chatToDelete, setChatToDelete] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const [isListening, setIsListening] = useState(false);
@@ -62,12 +71,20 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
       });
   }, [subjectId]);
 
-  const fetchChats = useCallback(async () => {
+  const fetchChats = useCallback(async (newChatIdJustUsed?: string) => {
     try {
       const res = await fetch(`/api/subjects/${subjectId}/chats`);
       const data = await res.json();
-      setChatSessions(data.chats || []);
-      return data.chats || [];
+      const loaded: ChatSession[] = data.chats || [];
+      
+      // If we just generated a title for a new chat, flag it for typing animation
+      if (newChatIdJustUsed) {
+         const found = loaded.find(c => c._id === newChatIdJustUsed);
+         if (found && found.title !== "New Chat") found.isTyping = true;
+      }
+      
+      setChatSessions(loaded);
+      return loaded;
     } catch {
       return [];
     }
@@ -126,7 +143,7 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
       const res = await fetch(`/api/subjects/${subjectId}/chats`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({}),
+        body: JSON.stringify({ title: "New Chat" }),
       });
       const data = await res.json();
       if (data.chat) {
@@ -134,9 +151,11 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
         setActiveChatId(data.chat._id);
         router.replace(`/chat/${subjectId}?chat=${data.chat._id}`);
         setMessages([]);
+      } else {
+        setErrorMsg(data.error || "Failed to create chat");
       }
     } catch {
-      alert("Failed to create chat");
+      setErrorMsg("Failed to create chat");
     } finally {
       setCreatingChat(false);
     }
@@ -165,20 +184,25 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
       });
       await fetchChats();
     } catch {
-      alert("Failed to rename chat");
+      setErrorMsg("Failed to rename chat");
     } finally {
       setEditingChatId(null);
     }
   };
 
-  const deleteChat = async (chatId: string) => {
-    if (!confirm("Delete this chat and all its messages?")) return;
+  const triggerDelete = (chatId: string) => {
+    setChatToDelete(chatId);
+  };
+
+  const confirmDelete = async () => {
+    if (!chatToDelete) return;
+    setIsDeleting(true);
     try {
-      await fetch(`/api/subjects/${subjectId}/chats/${chatId}`, {
+      await fetch(`/api/subjects/${subjectId}/chats/${chatToDelete}`, {
         method: "DELETE",
       });
       const chats = await fetchChats();
-      if (activeChatId === chatId) {
+      if (activeChatId === chatToDelete) {
         if (chats.length > 0) {
           setActiveChatId(chats[0]._id);
           router.replace(`/chat/${subjectId}?chat=${chats[0]._id}`);
@@ -189,14 +213,17 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
         }
       }
     } catch {
-      alert("Failed to delete chat");
+      setErrorMsg("Failed to delete chat");
+    } finally {
+      setIsDeleting(false);
+      setChatToDelete(null);
     }
   };
 
   // Speech Recognition
   const startListening = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) { alert("Speech recognition not supported. Try Chrome."); return; }
+    if (!SpeechRecognition) { setErrorMsg("Speech recognition not supported. Try Chrome."); return; }
     const recognition = new SpeechRecognition();
     recognition.continuous = false;
     recognition.interimResults = false;
@@ -251,10 +278,14 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
           chatId = data.chat._id;
           setActiveChatId(chatId);
           router.replace(`/chat/${subjectId}?chat=${chatId}`);
-          await fetchChats();
+          // Wait briefly, then re-fetch the list so auto-trigger of typewriter applies
+          await fetchChats(chatId || undefined);
+        } else {
+           setErrorMsg(data.error || "Failed to create chat session");
+           return;
         }
       } catch {
-        alert("Failed to create chat session");
+        setErrorMsg("Failed to create chat session");
         return;
       }
     }
@@ -345,7 +376,14 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
                 />
               ) : (
                 <>
-                  <span style={styles.chatTitle}>💬 {chat.title}</span>
+                  <span style={styles.chatTitle}>
+                    💬{" "}
+                    {chat.isTyping ? (
+                      <span className="typewriter-text">{chat.title}</span>
+                    ) : (
+                      chat.title
+                    )}
+                  </span>
                   <div style={styles.chatActions} className="chat-actions">
                     <button
                       onClick={(e) => { e.stopPropagation(); startRename(chat); }}
@@ -355,7 +393,7 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
                       ✏️
                     </button>
                     <button
-                      onClick={(e) => { e.stopPropagation(); deleteChat(chat._id); }}
+                      onClick={(e) => { e.stopPropagation(); triggerDelete(chat._id); }}
                       style={styles.chatActionBtn}
                       title="Delete"
                     >
@@ -547,10 +585,45 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
         </div>
       </div>
 
-      {/* Sidebar hover styles */}
+      <ErrorModal
+        isOpen={!!errorMsg}
+        message={errorMsg}
+        onClose={() => setErrorMsg("")}
+      />
+
+      <ConfirmModal
+        isOpen={!!chatToDelete}
+        title="Delete Chat"
+        message={isDeleting ? "Deleting..." : "Are you sure you want to delete this chat and all its messages?"}
+        confirmText={isDeleting ? "..." : "Delete"}
+        cancelText="Cancel"
+        isDestructive={true}
+        onConfirm={confirmDelete}
+        onCancel={() => !isDeleting && setChatToDelete(null)}
+      />
+
+      {/* Sidebar hover & typewriter animations */}
       <style>{`
         .chat-actions { opacity: 0; transition: opacity 0.2s; }
         div:hover > .chat-actions { opacity: 1; }
+        
+        .typewriter-text {
+          display: inline-block;
+          overflow: hidden;
+          white-space: nowrap;
+          border-right: 2px solid var(--accent-1);
+          animation: typing 2s steps(40, end), blink-caret 0.75s step-end infinite;
+        }
+
+        @keyframes typing {
+          from { width: 0 }
+          to { width: 100% }
+        }
+
+        @keyframes blink-caret {
+          from, to { border-color: transparent }
+          50% { border-color: var(--accent-1); }
+        }
       `}</style>
     </div>
   );

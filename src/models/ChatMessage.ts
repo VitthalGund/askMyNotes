@@ -42,7 +42,7 @@ const ChatMessageSchema = new Schema<IChatMessageDoc>(
         },
         sessionId: {
             type: String,
-            default: "",
+            required: false,
         },
         chatSessionId: {
             type: Schema.Types.ObjectId,
