@@ -20,6 +20,7 @@ function getGeminiKeys(): string[] {
 
 // Remove global tracked index to avoid Promise.all async race collisions
 // We will assign a random start index per request instead.
+const deadKeys = new Set<number>();
 
 
 /**
@@ -39,6 +40,14 @@ function isRotatableError(error: Error): boolean {
     );
 }
 
+/**
+ * Check if the error is permanent (like a leaked or deleted key)
+ */
+function isDeadKeyError(error: Error): boolean {
+    const errMsg = error.message.toLowerCase();
+    return errMsg.includes("leaked") || errMsg.includes("403") || errMsg.includes("unauthorized") || errMsg.includes("api key not valid");
+}
+
 // ─── Embedding Functions ──────────────────────────────────────────────────
 
 /**
@@ -52,6 +61,10 @@ export async function generateEmbedding(text: string): Promise<number[]> {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const keyIndex = (startIndex + attempt) % keys.length;
+
+        // Skip explicitly dead keys so we don't spam 403s
+        if (deadKeys.has(keyIndex)) continue;
+
         try {
             const genAI = new GoogleGenerativeAI(keys[keyIndex]);
             const model = genAI.getGenerativeModel({ model: GEMINI_EMBEDDING_MODEL });
@@ -60,6 +73,13 @@ export async function generateEmbedding(text: string): Promise<number[]> {
         } catch (error: unknown) {
             lastError = error instanceof Error ? error : new Error(String(error));
             console.warn(`[Embedding] Key ${keyIndex + 1}/${keys.length} failed with error: ${lastError.message}`);
+
+            if (isDeadKeyError(lastError)) {
+                console.warn(`[Embedding] Marking Key ${keyIndex + 1} as permanently dead.`);
+                deadKeys.add(keyIndex);
+                continue;
+            }
+
             if (isRotatableError(lastError)) {
                 console.warn(`[Embedding] Trying next key...`);
                 continue;
@@ -104,6 +124,9 @@ async function callGeminiWithFailover(prompt: string): Promise<string> {
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
         const keyIndex = (startIndex + attempt) % keys.length;
+
+        if (deadKeys.has(keyIndex)) continue;
+
         try {
             const genAI = new GoogleGenerativeAI(keys[keyIndex]);
             const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
@@ -113,6 +136,13 @@ async function callGeminiWithFailover(prompt: string): Promise<string> {
         } catch (error: unknown) {
             lastError = error instanceof Error ? error : new Error(String(error));
             console.warn(`[Gemini] Key ${keyIndex + 1}/${keys.length} failed with error: ${lastError.message}`);
+
+            if (isDeadKeyError(lastError)) {
+                console.warn(`[Gemini] Marking Key ${keyIndex + 1} as permanently dead.`);
+                deadKeys.add(keyIndex);
+                continue;
+            }
+
             if (isRotatableError(lastError)) {
                 console.warn(`[Gemini] Trying next key...`);
                 continue;

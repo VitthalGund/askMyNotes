@@ -3,6 +3,7 @@ import { getServerSession } from "next-auth";
 import { authOptions } from "@/lib/auth";
 import dbConnect from "@/lib/mongodb";
 import DocModel from "@/models/Document";
+import { deleteFromCloudinary } from "@/lib/cloudinary";
 
 export async function DELETE(
     _req: NextRequest,
@@ -21,6 +22,10 @@ export async function DELETE(
         const doc = await DocModel.findOne({ _id: docId, userId });
         if (!doc) {
             return NextResponse.json({ error: "Document not found" }, { status: 404 });
+        }
+
+        if (doc.fileUrl) {
+            await deleteFromCloudinary(doc.fileUrl);
         }
 
         await DocModel.findByIdAndDelete(docId);

@@ -5,6 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import ErrorModal from "@/components/ErrorModal";
 import ConfirmModal from "@/components/ConfirmModal";
+import PreviewModal from "@/components/PreviewModal";
 
 
 
@@ -17,6 +18,7 @@ interface Subject {
 interface DocInfo {
   _id: string;
   fileName: string;
+  fileUrl?: string;
   chunkCount: number;
   createdAt: string;
 }
@@ -38,6 +40,7 @@ export default function DashboardPage() {
   const [isDeletingSubject, setIsDeletingSubject] = useState(false);
   const [docToDelete, setDocToDelete] = useState<{ subjectId: string; docId: string } | null>(null);
   const [isDeletingDoc, setIsDeletingDoc] = useState(false);
+  const [previewFile, setPreviewFile] = useState<{ url: string | null; name: string } | null>(null);
 
   useEffect(() => {
     if (status === "unauthenticated") router.push("/login");
@@ -277,7 +280,14 @@ export default function DashboardPage() {
                     <div style={styles.docList}>
                       {docs.map((doc) => (
                         <div key={doc._id} style={styles.docItem}>
-                          <span style={styles.docName}>📄 {doc.fileName}</span>
+                          <button 
+                            onClick={() => setPreviewFile({ url: doc.fileUrl || null, name: doc.fileName })}
+                            style={styles.docNameBtn}
+                            className="hover-underline"
+                            title="Preview Document"
+                          >
+                            📄 {doc.fileName}
+                          </button>
                           <button
                             onClick={() => triggerDeleteDoc(sub._id, doc._id)}
                             style={styles.docDelete}
@@ -361,12 +371,19 @@ export default function DashboardPage() {
       <ConfirmModal
         isOpen={!!docToDelete}
         title="Delete Document"
-        message={isDeletingDoc ? "Deleting..." : "Are you sure you want to delete this document?"}
+        message={isDeletingDoc ? "Deleting..." : "Are you sure you want to delete this document? This will also permanently remove the file from Cloudinary storage."}
         confirmText={isDeletingDoc ? "..." : "Delete"}
         cancelText="Cancel"
         isDestructive={true}
         onConfirm={confirmDeleteDoc}
         onCancel={() => !isDeletingDoc && setDocToDelete(null)}
+      />
+
+      <PreviewModal
+        isOpen={!!previewFile}
+        fileUrl={previewFile?.url || null}
+        fileName={previewFile?.name || ""}
+        onClose={() => setPreviewFile(null)}
       />
 
     </div>
@@ -522,6 +539,19 @@ const styles: Record<string, React.CSSProperties> = {
     textOverflow: "ellipsis",
     whiteSpace: "nowrap",
     flex: 1,
+  },
+  docNameBtn: {
+    background: "none",
+    border: "none",
+    color: "var(--text-primary)",
+    cursor: "pointer",
+    fontSize: 13,
+    padding: 0,
+    overflow: "hidden",
+    textOverflow: "ellipsis",
+    whiteSpace: "nowrap",
+    flex: 1,
+    textAlign: "left",
   },
   docDelete: {
     background: "none",

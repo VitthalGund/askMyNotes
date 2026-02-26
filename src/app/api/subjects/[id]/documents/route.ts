@@ -29,12 +29,13 @@ export async function GET(
         }
 
         const documents = await DocModel.find({ subjectId: id }).select(
-            "fileName createdAt chunks"
+            "fileName fileUrl createdAt chunks"
         );
 
         const docs = documents.map((d) => ({
             _id: d._id,
             fileName: d.fileName,
+            fileUrl: d.fileUrl || null,
             chunkCount: d.chunks.length,
             createdAt: d.createdAt,
         }));

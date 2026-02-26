@@ -43,3 +43,22 @@ export async function uploadToCloudinary(
         uploadStream.end(buffer);
     });
 }
+
+
+export async function deleteFromCloudinary(fileUrl: string): Promise<void> {
+    try {
+        const parts = fileUrl.split("/");
+        const uploadIndex = parts.findIndex((p) => p === "upload");
+        if (uploadIndex === -1) return;
+
+        // Extracts the public_id (everything after the /v12345/ version tag)
+        const publicIdWithExt = parts.slice(uploadIndex + 2).join("/");
+
+        // For raw files, the extension is often considered part of the public_id depending on how it was uploaded
+        // We'll try destroying it exactly as it appears in the URL
+        await cloudinary.uploader.destroy(publicIdWithExt, { resource_type: "raw" });
+        console.log(`Deleted raw file from Cloudinary: ${publicIdWithExt}`);
+    } catch (error) {
+        console.error("Failed to delete from Cloudinary:", error);
+    }
+}
