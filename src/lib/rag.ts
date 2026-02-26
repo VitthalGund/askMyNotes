@@ -5,6 +5,7 @@ import { generateEmbedding } from "@/lib/gemini";
 interface ChunkWithMeta {
     content: string;
     fileName: string;
+    fileUrl?: string;
     pageNumber: number;
     chunkIndex: number;
     score: number;
@@ -85,6 +86,7 @@ async function retrieveByEmbedding(
             scoredChunks.push({
                 content: chunk.content,
                 fileName: doc.fileName,
+                fileUrl: doc.fileUrl,
                 pageNumber: chunk.pageNumber,
                 chunkIndex: chunk.chunkIndex,
                 score,
@@ -122,6 +124,7 @@ function retrieveByKeyword(
                 scoredChunks.push({
                     content: chunk.content,
                     fileName: doc.fileName,
+                    fileUrl: doc.fileUrl,
                     pageNumber: chunk.pageNumber,
                     chunkIndex: chunk.chunkIndex,
                     score,
@@ -151,6 +154,7 @@ export async function retrieveAllChunks(
             allChunks.push({
                 content: chunk.content,
                 fileName: doc.fileName,
+                fileUrl: doc.fileUrl,
                 pageNumber: chunk.pageNumber,
                 chunkIndex: chunk.chunkIndex,
                 score: 1,

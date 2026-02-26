@@ -4,6 +4,7 @@ export interface ICitationDoc {
     fileName: string;
     pageNumber: number;
     chunkIndex: number;
+    fileUrl?: string;
 }
 
 export interface IChatMessageDoc extends Document {

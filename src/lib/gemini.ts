@@ -18,8 +18,8 @@ function getGeminiKeys(): string[] {
         .filter((k) => k.length > 0);
 }
 
-// Track which key index to use next (round-robin on failures)
-let currentKeyIndex = 0;
+// Remove global tracked index to avoid Promise.all async race collisions
+// We will assign a random start index per request instead.
 
 
 /**
@@ -48,22 +48,25 @@ export async function generateEmbedding(text: string): Promise<number[]> {
     const keys = getGeminiKeys();
     const maxAttempts = keys.length;
     let lastError: Error | null = null;
+    const startIndex = Math.floor(Math.random() * keys.length);
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const keyIndex = (currentKeyIndex + attempt) % keys.length;
+        const keyIndex = (startIndex + attempt) % keys.length;
         try {
             const genAI = new GoogleGenerativeAI(keys[keyIndex]);
             const model = genAI.getGenerativeModel({ model: GEMINI_EMBEDDING_MODEL });
             const result = await model.embedContent(text);
-            currentKeyIndex = (keyIndex + 1) % keys.length;
             return result.embedding.values;
         } catch (error: unknown) {
             lastError = error instanceof Error ? error : new Error(String(error));
+            console.warn(`[Embedding] Key ${keyIndex + 1}/${keys.length} failed with error: ${lastError.message}`);
             if (isRotatableError(lastError)) {
-                console.warn(`[Embedding] Key ${keyIndex + 1}/${keys.length} failed, trying next...`);
+                console.warn(`[Embedding] Trying next key...`);
                 continue;
             }
-            throw lastError;
+            // If it's a structural or network error, we want to try the next key anyway, 
+            // as this could be an intermittent issue or a bad key.
+            continue;
         }
     }
     throw new Error(`All keys exhausted for embedding. Last error: ${lastError?.message}`);
@@ -97,23 +100,24 @@ async function callGeminiWithFailover(prompt: string): Promise<string> {
     const keys = getGeminiKeys();
     const maxAttempts = keys.length;
     let lastError: Error | null = null;
+    const startIndex = Math.floor(Math.random() * keys.length);
 
     for (let attempt = 0; attempt < maxAttempts; attempt++) {
-        const keyIndex = (currentKeyIndex + attempt) % keys.length;
+        const keyIndex = (startIndex + attempt) % keys.length;
         try {
             const genAI = new GoogleGenerativeAI(keys[keyIndex]);
             const model = genAI.getGenerativeModel({ model: GEMINI_MODEL });
             const result = await model.generateContent(prompt);
             const text = result.response.text().trim();
-            currentKeyIndex = (keyIndex + 1) % keys.length;
             return text;
         } catch (error: unknown) {
             lastError = error instanceof Error ? error : new Error(String(error));
+            console.warn(`[Gemini] Key ${keyIndex + 1}/${keys.length} failed with error: ${lastError.message}`);
             if (isRotatableError(lastError)) {
-                console.warn(`[Gemini] Key ${keyIndex + 1}/${keys.length} failed, trying next...`);
+                console.warn(`[Gemini] Trying next key...`);
                 continue;
             }
-            throw lastError;
+            continue;
         }
     }
     throw new Error(`All ${keys.length} Gemini API keys exhausted. Last error: ${lastError?.message}`);
@@ -145,6 +149,7 @@ async function callOllama(prompt: string): Promise<string> {
 interface ChunkWithMeta {
     content: string;
     fileName: string;
+    fileUrl?: string;
     pageNumber: number;
     chunkIndex: number;
     score: number;
@@ -152,7 +157,7 @@ interface ChunkWithMeta {
 
 interface AnswerResult {
     answer: string;
-    citations: { fileName: string; pageNumber: number; chunkIndex: number }[];
+    citations: { fileName: string; fileUrl?: string; pageNumber: number; chunkIndex: number }[];
     confidence: "High" | "Medium" | "Low";
     confidenceExplanation: string;
     evidenceSnippets: string[];
@@ -313,6 +318,7 @@ Respond in this EXACT JSON format (no markdown, no code fences):
             .filter((idx: number) => idx >= 1 && idx <= chunks.length)
             .map((idx: number) => ({
                 fileName: chunks[idx - 1].fileName,
+                fileUrl: chunks[idx - 1].fileUrl,
                 pageNumber: chunks[idx - 1].pageNumber,
                 chunkIndex: chunks[idx - 1].chunkIndex,
             }));

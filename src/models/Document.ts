@@ -11,6 +11,7 @@ export interface IDocumentDoc extends Document {
     fileName: string;
     subjectId: mongoose.Types.ObjectId;
     userId: mongoose.Types.ObjectId;
+    fileUrl?: string;
     chunks: IChunkDoc[];
     createdAt: Date;
 }
@@ -41,6 +42,9 @@ const DocumentSchema = new Schema<IDocumentDoc>(
             type: Schema.Types.ObjectId,
             ref: "User",
             required: true,
+        },
+        fileUrl: {
+            type: String,
         },
         chunks: [ChunkSchema],
     },

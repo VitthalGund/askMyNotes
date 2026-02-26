@@ -9,6 +9,7 @@ import ConfirmModal from "@/components/ConfirmModal";
 
 interface Citation {
   fileName: string;
+  fileUrl?: string;
   pageNumber: number;
   chunkIndex: number;
 }
@@ -489,7 +490,19 @@ export default function ChatPage({ params }: { params: Promise<{ subjectId: stri
                     <div style={styles.citationsHeader}>📎 Citations</div>
                     {msg.citations.map((c, ci) => (
                       <div key={ci} style={styles.citationItem}>
-                        📄 {c.fileName} — Page {c.pageNumber}, Chunk {c.chunkIndex}
+                        {c.fileUrl ? (
+                          <a 
+                            href={`${c.fileUrl}#page=${c.pageNumber}`} 
+                            target="_blank" 
+                            rel="noopener noreferrer"
+                            style={{ color: "var(--accent-2)", textDecoration: "none" }}
+                            className="hover-underline"
+                          >
+                            📄 {c.fileName} — Page {c.pageNumber}, Chunk {c.chunkIndex}
+                          </a>
+                        ) : (
+                          <span>📄 {c.fileName} — Page {c.pageNumber}, Chunk {c.chunkIndex}</span>
+                        )}
                       </div>
                     ))}
                   </div>

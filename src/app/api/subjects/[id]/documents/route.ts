@@ -6,6 +6,7 @@ import Subject from "@/models/Subject";
 import DocModel from "@/models/Document";
 import { parsePDF, parseTXT } from "@/lib/parser";
 import { generateEmbeddings } from "@/lib/gemini";
+import { uploadToCloudinary } from "@/lib/cloudinary";
 
 export async function GET(
     _req: NextRequest,
@@ -111,8 +112,20 @@ export async function POST(
                 // Continue without embeddings — keyword fallback will be used
             }
 
+            // Upload file to Cloudinary
+            let fileUrl = "";
+            try {
+                const cloudinaryResult = await uploadToCloudinary(buffer, fileName);
+                fileUrl = cloudinaryResult.secure_url;
+            } catch (cloudError) {
+                console.error(`Failed to upload ${fileName} to Cloudinary:`, cloudError);
+                // We'll continue saving local text even if Cloudinary fails, 
+                // but the UI won't have a highlightable PDF link.
+            }
+
             const doc = await DocModel.create({
                 fileName,
+                fileUrl,
                 subjectId: id,
                 userId,
                 chunks,
